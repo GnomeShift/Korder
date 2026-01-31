@@ -86,7 +86,7 @@ class ExposedProductRepository : ProductRepository {
             it[id] = productId
             it[name] = command.name
             it[description] = command.description
-            it[priceAmount] = command.price.amount
+            it[price] = command.price.amount
             it[categoryId] = command.categoryId.value
             it[createdAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
             it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
@@ -110,7 +110,7 @@ class ExposedProductRepository : ProductRepository {
         val updated = ProductsTable.update({ ProductsTable.id eq id.value }) { stmt ->
             command.name?.let { stmt[name] = it }
             command.description?.let { stmt[description] = it }
-            command.price?.let { stmt[priceAmount] = it.amount }
+            command.price?.let { stmt[price] = it.amount }
             command.categoryId?.let { stmt[categoryId] = it.value }
         }
 
@@ -132,7 +132,7 @@ class ExposedProductRepository : ProductRepository {
             id = ProductId(this[ProductsTable.id].value),
             name = this[ProductsTable.name],
             description = this[ProductsTable.description],
-            price = Money(this[ProductsTable.priceAmount]),
+            price = Money(this[ProductsTable.price]),
             category = category,
             createdAt = this[ProductsTable.createdAt].toInstant().toKotlinInstant(),
             updatedAt = this[ProductsTable.updatedAt].toInstant().toKotlinInstant()

@@ -71,11 +71,7 @@ class DatabaseFactory(private val config: DatabaseConfig) {
             .cleanDisabled(true)
             .load()
 
-        val result = flyway.migrate()
-
-        logger.info {
-            "${result.migrationsExecuted} migrations applied, current version: ${result.targetSchemaVersion}"
-        }
+        flyway.migrate()
     }
 }
 

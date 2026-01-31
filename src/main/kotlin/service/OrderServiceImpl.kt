@@ -1,23 +1,10 @@
 package service
 
-import exception.EntityNotFoundException
-import exception.InsufficientStockException
-import exception.InvalidOrderStateException
+import exception.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import model.CustomerId
-import model.Order
-import model.OrderId
-import model.OrderItem
-import model.OrderItemId
-import model.OrderStatus
-import model.Stock
+import model.*
 import persistence.UnitOfWork
-import repository.CustomerRepository
-import repository.OrderRepository
-import repository.PaginatedResult
-import repository.Pagination
-import repository.ProductRepository
-import repository.StockRepository
+import repository.*
 import kotlin.time.Clock
 
 private val logger = KotlinLogging.logger {}
@@ -26,16 +13,20 @@ class OrderServiceImpl(
     private val orderRepository: OrderRepository,
     private val productRepository: ProductRepository,
     private val stockRepository: StockRepository,
-    private val customerRepository: CustomerRepository,
+    private val userRepository: UserRepository,
     private val unitOfWork: UnitOfWork
 ) : OrderService {
-    override suspend fun createOrder(command: CreateOrderCommand): Result<Order> = runCatching {
+    override suspend fun createOrder(userId: UserId, command: CreateOrderCommand): Result<Order> = runCatching {
         unitOfWork.transaction {
-            logger.info { "Creating order for customer ${command.customerId}" }
+            logger.info { "Creating order for user $userId" }
 
             // Validate customer existence
-            customerRepository.findById(command.customerId)
-                ?: throw EntityNotFoundException("Customer", command.customerId.toString())
+            val user = userRepository.findById(userId)
+                ?: throw EntityNotFoundException("User", userId.toString())
+
+            if (!user.isActive) {
+                throw BusinessRuleViolationException("User account deactivated")
+            }
 
             // Load and validate products
             val productIds = command.items.map { it.productId }
@@ -87,7 +78,7 @@ class OrderServiceImpl(
 
             val order = Order(
                 id = OrderId.generate(),
-                customerId = command.customerId,
+                userId = userId,
                 status = OrderStatus.PENDING,
                 items = orderItems,
                 createdAt = now,
@@ -104,16 +95,21 @@ class OrderServiceImpl(
         }
     }
 
-    override suspend fun cancelOrder(orderId: OrderId): Result<Order> = runCatching {
+    override suspend fun cancelOrder(userId: UserId, orderId: OrderId): Result<Order> = runCatching {
         unitOfWork.transaction {
-            logger.info { "Cancelling order $orderId" }
+            logger.info { "User $userId cancelling order $orderId" }
 
             val order = orderRepository.findById(orderId)
-                ?: throw EntityNotFoundException("Order", orderId.value.toString())
+                ?: throw EntityNotFoundException("Order", orderId.toString())
+
+            // Check for user ownership
+            if (order.userId != userId) {
+                throw AuthorizationException("You don't have permission")
+            }
 
             if (!order.canCancel()) {
                 throw InvalidOrderStateException(
-                    orderId = orderId.value.toString(),
+                    orderId = orderId.toString(),
                     currentStatus = order.status.name,
                     action = "cancel"
                 )
@@ -131,21 +127,26 @@ class OrderServiceImpl(
         }
     }
 
-    override suspend fun deleteOrder(orderId: OrderId): Result<Boolean> = runCatching {
+    override suspend fun deleteOrder(userId: UserId, orderId: OrderId): Result<Boolean> = runCatching {
         unitOfWork.transaction {
-            logger.info { "Deleting order $orderId" }
+            logger.info { "User $userId deleting order $orderId" }
 
             val order = orderRepository.findById(orderId)
-                ?: throw EntityNotFoundException("Order", orderId.value.toString())
+                ?: throw EntityNotFoundException("Order", orderId.toString())
 
-            // Allow to delete only cancelled or finished orders
+            // Check for user ownership
+            if (order.userId != userId) {
+                throw AuthorizationException("You don't have permission")
+            }
+
+            // Allow deletion only cancelled or finished orders
             if (order.status !in listOf(OrderStatus.CANCELLED, OrderStatus.COMPLETED)) {
                 // If order is active - cancel firstly
                 if (order.canCancel()) {
                     releaseStock(order)
                 } else {
                     throw InvalidOrderStateException(
-                        orderId = orderId.value.toString(),
+                        orderId = orderId.toString(),
                         currentStatus = order.status.name,
                         action = "delete"
                     )
@@ -167,11 +168,11 @@ class OrderServiceImpl(
             logger.info { "Confirming order $orderId" }
 
             val order = orderRepository.findById(orderId)
-                ?: throw EntityNotFoundException("Order", orderId.value.toString())
+                ?: throw EntityNotFoundException("Order", orderId.toString())
 
             if (!order.canConfirm()) {
                 throw InvalidOrderStateException(
-                    orderId = orderId.value.toString(),
+                    orderId = orderId.toString(),
                     currentStatus = order.status.name,
                     action = "confirm"
                 )
@@ -183,7 +184,7 @@ class OrderServiceImpl(
 
             val updatedStocks = order.items.map { item ->
                 val stock = stockMap[item.productId]
-                    ?: throw EntityNotFoundException("Stock", item.productId.value.toString())
+                    ?: throw EntityNotFoundException("Stock", item.productId.toString())
                 stock.confirmReservation(item.quantity)
             }
 
@@ -198,22 +199,30 @@ class OrderServiceImpl(
         }
     }
 
-    override suspend fun getOrder(orderId: OrderId): Order? {
-        return orderRepository.findById(orderId)
+    override suspend fun getOrder(userId: UserId, orderId: OrderId): Order? {
+        val order = orderRepository.findById(orderId) ?: return null
+
+        // User can only see their own orders
+        if (order.userId != userId) {
+            throw AuthorizationException("You don't have permission")
+        }
+
+        return order
     }
 
     override suspend fun getAllOrders(
         pagination: Pagination,
         status: OrderStatus?
     ): PaginatedResult<Order> {
+        // Это админский метод - проверка прав на уровне route
         return orderRepository.findAll(pagination, status)
     }
 
-    override suspend fun getCustomerOrders(
-        customerId: CustomerId,
+    override suspend fun getUserOrders(
+        userId: UserId,
         pagination: Pagination
     ): PaginatedResult<Order> {
-        return orderRepository.findByCustomerId(customerId, pagination)
+        return orderRepository.findByUserId(userId, pagination)
     }
 
     private suspend fun releaseStock(order: Order) {
@@ -222,7 +231,7 @@ class OrderServiceImpl(
 
         val updatedStocks = order.items.map { item ->
             val stock = stockMap[item.productId]
-                ?: throw EntityNotFoundException("Stock", item.productId.value.toString())
+                ?: throw EntityNotFoundException("Stock", item.productId.toString())
 
             when (order.status) {
                 OrderStatus.PENDING -> stock.cancelReservation(item.quantity)
@@ -232,6 +241,6 @@ class OrderServiceImpl(
         }
 
         stockRepository.updateBatch(updatedStocks)
-        logger.debug { "Released stock for order ${order.id.value}" }
+        logger.debug { "Released stock for order ${order.id}" }
     }
 }

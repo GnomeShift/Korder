@@ -3,6 +3,8 @@ package plugins
 import dto.ErrorResponse
 import dto.FieldError
 import dto.ValidationErrorResponse
+import exception.AuthorizationException
+import exception.BusinessRuleViolationException
 import exception.EntityNotFoundException
 import exception.InsufficientStockException
 import exception.InvalidOrderStateException
@@ -13,6 +15,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.requestvalidation.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
+import javax.naming.AuthenticationException
 
 private val logger = KotlinLogging.logger {}
 
@@ -32,6 +35,22 @@ fun Application.configureExceptionHandling() {
             call.respond(
                 HttpStatusCode.BadRequest,
                 ValidationErrorResponse(errors = errors)
+            )
+        }
+
+        exception<AuthenticationException> { call, cause ->
+            logger.warn { "Authentication failed: ${cause.message}" }
+            call.respond(
+                HttpStatusCode.Unauthorized,
+                ErrorResponse("Unauthorized", cause.message ?: "Authentication failed")
+            )
+        }
+
+        exception<AuthorizationException> { call, cause ->
+            logger.warn { "Authorization failed: ${cause.message}" }
+            call.respond(
+                HttpStatusCode.Forbidden,
+                ErrorResponse("Forbidden", cause.message ?: "Access denied")
             )
         }
 
@@ -63,6 +82,14 @@ fun Application.configureExceptionHandling() {
             call.respond(
                 HttpStatusCode.BadRequest,
                 ValidationErrorResponse(errors = cause.errors.map { FieldError(it.field, it.message) })
+            )
+        }
+
+        exception<BusinessRuleViolationException> { call, cause ->
+            logger.warn { "Business rule violation: ${cause.message}" }
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ErrorResponse("Bad Request", cause.message ?: "Bad request")
             )
         }
 

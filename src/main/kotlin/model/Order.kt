@@ -4,14 +4,13 @@ import kotlin.time.Instant
 
 data class Order(
     val id: OrderId,
-    val customerId: CustomerId,
+    val userId: UserId,
     val status: OrderStatus,
     val items: List<OrderItem>,
     val createdAt: Instant,
     val updatedAt: Instant
 ) {
     val totalAmount: Money get() = items.fold(Money.ZERO) { acc, item -> acc + item.subtotal }
-
     val totalItems: Int get() = items.sumOf { it.quantity }
 
     fun canCancel(): Boolean = status in listOf(

@@ -6,6 +6,8 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import model.ProductId
+import plugins.adminOnly
+import plugins.requireAdmin
 import repository.Pagination
 import service.ProductService
 import java.util.*
@@ -55,38 +57,47 @@ fun Route.productRoutes(productService: ProductService) {
             call.respond(product.toResponse())
         }
 
-        post {
-            val request = call.receive<CreateProductRequest>()
-            val product = productService.createProduct(request.toCommand())
-            call.respond(HttpStatusCode.Created, product.toResponse())
-        }
+        adminOnly {
+            post {
+                call.requireAdmin()
 
-        patch("{id}") {
-            val id = call.parameters["id"]?.toUUIDOrNull()
-                ?: return@patch call.respond(
-                    HttpStatusCode.BadRequest,
-                    ErrorResponse("Bad Request", "Invalid product id")
-                )
+                val request = call.receive<CreateProductRequest>()
+                val product = productService.createProduct(request.toCommand())
 
-            val request = call.receive<UpdateProductRequest>()
-            val product = productService.updateProduct(ProductId(id), request.toCommand())
-                ?: return@patch call.respond(
-                    HttpStatusCode.NotFound,
-                    ErrorResponse("Not Found", "Product with id $id not found")
-                )
+                call.respond(HttpStatusCode.Created, product.toResponse())
+            }
 
-            call.respond(product.toResponse())
-        }
+            patch("{id}") {
+                call.requireAdmin()
 
-        delete("{id}") {
-            val id = call.parameters["id"]?.toUUIDOrNull()
-                ?: return@delete call.respond(
-                    HttpStatusCode.BadRequest,
-                    ErrorResponse("Bad Request", "Invalid product id")
-                )
+                val id = call.parameters["id"]?.toUUIDOrNull()
+                    ?: return@patch call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse("Bad Request", "Invalid product id")
+                    )
 
-            productService.deleteProduct(ProductId(id))
-            call.respond(HttpStatusCode.NoContent)
+                val request = call.receive<UpdateProductRequest>()
+                val product = productService.updateProduct(ProductId(id), request.toCommand())
+                    ?: return@patch call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Not Found", "Product with id $id not found")
+                    )
+
+                call.respond(product.toResponse())
+            }
+
+            delete("{id}") {
+                call.requireAdmin()
+
+                val id = call.parameters["id"]?.toUUIDOrNull()
+                    ?: return@delete call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse("Bad Request", "Invalid product id")
+                    )
+
+                productService.deleteProduct(ProductId(id))
+                call.respond(HttpStatusCode.NoContent)
+            }
         }
     }
 }

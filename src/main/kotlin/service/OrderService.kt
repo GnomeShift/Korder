@@ -5,17 +5,16 @@ import repository.PaginatedResult
 import repository.Pagination
 
 interface OrderService {
-    suspend fun createOrder(command: CreateOrderCommand): Result<Order>
-    suspend fun cancelOrder(orderId: OrderId): Result<Order>
-    suspend fun deleteOrder(orderId: OrderId): Result<Boolean>
+    suspend fun createOrder(userId: UserId, command: CreateOrderCommand): Result<Order>
+    suspend fun cancelOrder(userId: UserId, orderId: OrderId): Result<Order>
+    suspend fun deleteOrder(userId: UserId, orderId: OrderId): Result<Boolean>
     suspend fun confirmOrder(orderId: OrderId): Result<Order>
-    suspend fun getOrder(orderId: OrderId): Order?
+    suspend fun getOrder(userId: UserId, orderId: OrderId): Order?
     suspend fun getAllOrders(pagination: Pagination, status: OrderStatus? = null): PaginatedResult<Order>
-    suspend fun getCustomerOrders(customerId: CustomerId, pagination: Pagination): PaginatedResult<Order>
+    suspend fun getUserOrders(userId: UserId, pagination: Pagination): PaginatedResult<Order>
 }
 
 data class CreateOrderCommand(
-    val customerId: CustomerId,
     val items: List<OrderItemRequest>
 ) {
     init {

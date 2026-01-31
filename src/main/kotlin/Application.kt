@@ -6,26 +6,27 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.netty.EngineMain
+import io.ktor.server.netty.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.requestvalidation.*
-import io.ktor.server.request.httpMethod
-import io.ktor.server.request.path
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 import plugins.configureExceptionHandling
+import plugins.configureSecurity
 import repository.CategoryRepository
-import repository.CustomerRepository
+import routes.authRoutes
 import routes.categoryRoutes
-import routes.customerRoutes
 import routes.orderRoutes
 import routes.productRoutes
+import service.AuthService
 import service.OrderService
 import service.ProductService
 import validation.configureValidation
@@ -42,10 +43,7 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
-    val appConfig by lazy {
-        AppConfig.load(environment)
-    }
-
+    val appConfig by inject<AppConfig>()
     logger.info { "Starting application in ${appConfig.environment} mode" }
 
     // DI
@@ -58,6 +56,15 @@ fun Application.module() {
     val databaseFactory by inject<DatabaseFactory>()
     databaseFactory.connect()
 
+    // Create default admin if doesn't exists
+    val authService by inject<AuthService>()
+    runBlocking {
+        authService.checkAdminExistence(
+            email = appConfig.admin.email,
+            password = appConfig.admin.password
+        )
+    }
+
     // Graceful shutdown
     monitor.subscribe(ApplicationStopped) {
         logger.info { "Application stopping..." }
@@ -68,6 +75,7 @@ fun Application.module() {
     configureContentNegotiation()
     configureCors(appConfig)
     configureCallLogging()
+    configureSecurity(appConfig.jwt, authService)
 
     install(RequestValidation) {
         configureValidation()
@@ -139,8 +147,8 @@ private fun Application.configureCallLogging() {
 private fun Application.configureRouting() {
     val productService by inject<ProductService>()
     val orderService by inject<OrderService>()
-    val customerRepository by inject<CustomerRepository>()
     val categoryRepository by inject<CategoryRepository>()
+    val authService by inject<AuthService>()
 
     routing {
         get("/health") {
@@ -150,9 +158,9 @@ private fun Application.configureRouting() {
         }
 
         // API routes
+        authRoutes(authService)
         productRoutes(productService)
         orderRoutes(orderService)
-        customerRoutes(customerRepository)
         categoryRoutes(categoryRepository)
     }
 }
