@@ -125,7 +125,7 @@ private fun Application.configureCors(config: AppConfig) {
                 ?.filter { it.isNotEmpty() }
                 ?: emptyList()
 
-            allowedHosts.forEach { _ -> }
+            allowedHosts.forEach { host -> allowHost(host, schemes = listOf("https", "http")) }
         }
     }
 }
