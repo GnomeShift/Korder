@@ -1,8 +1,9 @@
 package validation
 
-import dto.CreateCustomerRequest
 import dto.CreateOrderRequest
 import dto.CreateProductRequest
+import dto.LoginRequest
+import dto.RegisterRequest
 import dto.UpdateProductRequest
 import io.ktor.server.plugins.requestvalidation.*
 import java.util.*
@@ -59,9 +60,6 @@ fun RequestValidationConfig.configureValidation() {
     validate<CreateOrderRequest> { request ->
         val errors = mutableListOf<String>()
 
-        if (!request.customerId.isValidUUID()) {
-            errors.add("customerId: must be a valid UUID")
-        }
         if (request.items.isEmpty()) {
             errors.add("items: order must have at least one item")
         }
@@ -88,7 +86,7 @@ fun RequestValidationConfig.configureValidation() {
         else ValidationResult.Invalid(errors)
     }
 
-    validate<CreateCustomerRequest> { request ->
+    validate<RegisterRequest> { request ->
         val errors = mutableListOf<String>()
 
         if (request.email.isBlank()) {
@@ -96,6 +94,12 @@ fun RequestValidationConfig.configureValidation() {
         }
         if (!request.email.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"))) {
             errors.add("email: invalid format")
+        }
+        if (request.password.length < 8) {
+            errors.add("password: must be at least 8 characters")
+        }
+        if (request.password.length > 100) {
+            errors.add("password: cannot exceed 100 characters")
         }
         if (request.firstName.isBlank()) {
             errors.add("firstName: cannot be blank")
@@ -109,10 +113,19 @@ fun RequestValidationConfig.configureValidation() {
         if (request.lastName.length > 100) {
             errors.add("lastName: cannot exceed 100 characters")
         }
-        request.phone?.let {
-            if (!it.matches(Regex("^\\+?[0-9]{10,15}$"))) {
-                errors.add("phone: invalid format")
-            }
+
+        if (errors.isEmpty()) ValidationResult.Valid
+        else ValidationResult.Invalid(errors)
+    }
+
+    validate<LoginRequest> { request ->
+        val errors = mutableListOf<String>()
+
+        if (request.email.isBlank()) {
+            errors.add("email: cannot be blank")
+        }
+        if (request.password.isBlank()) {
+            errors.add("password: cannot be blank")
         }
 
         if (errors.isEmpty()) ValidationResult.Valid

@@ -31,18 +31,18 @@ class ExposedOrderRepository : OrderRepository {
         orderRow.toOrder(items)
     }
 
-    override suspend fun findByCustomerId(
-        customerId: CustomerId,
+    override suspend fun findByUserId(
+        userId: UserId,
         pagination: Pagination
     ): PaginatedResult<Order> = dbQuery {
         val total = OrdersTable
             .selectAll()
-            .where { OrdersTable.customerId eq customerId.value }
+            .where { OrdersTable.userId eq userId.value }
             .count()
 
         val orderRows = OrdersTable
             .selectAll()
-            .where { OrdersTable.customerId eq customerId.value }
+            .where { OrdersTable.userId eq userId.value }
             .orderBy(OrdersTable.createdAt to SortOrder.DESC)
             .limit(pagination.size)
             .toList()
@@ -90,7 +90,7 @@ class ExposedOrderRepository : OrderRepository {
 
         OrdersTable.insert {
             it[id] = orderId
-            it[customerId] = order.customerId.value
+            it[userId] = order.userId.value
             it[status] = order.status.name
             it[totalAmount] = order.totalAmount.amount
             it[createdAt] = order.createdAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
@@ -136,7 +136,7 @@ class ExposedOrderRepository : OrderRepository {
 
     private fun ResultRow.toOrder(items: List<OrderItem>) = Order(
         id = OrderId(this[OrdersTable.id].value),
-        customerId = CustomerId(this[OrdersTable.customerId].value),
+        userId = UserId(this[OrdersTable.userId].value),
         status = OrderStatus.valueOf(this[OrdersTable.status]),
         items = items,
         createdAt = this[OrdersTable.createdAt].toInstant().toKotlinInstant(),

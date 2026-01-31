@@ -38,3 +38,7 @@ data class ValidationError(
 class BusinessRuleViolationException(
     message: String
 ) : DomainException(message)
+
+class AuthorizationException(
+    message: String = "Access denied"
+) : DomainException(message)

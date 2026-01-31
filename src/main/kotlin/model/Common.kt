@@ -46,17 +46,6 @@ value class CategoryId(@Serializable(with = UUIDSerializer::class) val value: UU
 
 @Serializable
 @JvmInline
-value class CustomerId(@Serializable(with = UUIDSerializer::class) val value: UUID) {
-    companion object {
-        fun generate(): CustomerId = CustomerId(UUID.randomUUID())
-        fun fromString(value: String): CustomerId = CustomerId(UUID.fromString(value))
-    }
-
-    override fun toString(): String = value.toString()
-}
-
-@Serializable
-@JvmInline
 value class OrderId(@Serializable(with = UUIDSerializer::class) val value: UUID) {
     companion object {
         fun generate(): OrderId = OrderId(UUID.randomUUID())

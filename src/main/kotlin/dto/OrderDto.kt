@@ -1,7 +1,6 @@
 package dto
 
 import kotlinx.serialization.Serializable
-import model.CustomerId
 import model.Order
 import model.OrderItem
 import model.ProductId
@@ -11,7 +10,7 @@ import service.OrderItemRequest
 @Serializable
 data class OrderResponse(
     val id: String,
-    val customerId: String,
+    val userId: String,
     val status: String,
     val items: List<OrderItemResponse>,
     val totalAmount: Double,
@@ -34,11 +33,9 @@ data class OrderItemResponse(
 
 @Serializable
 data class CreateOrderRequest(
-    val customerId: String,
     val items: List<OrderItemRequestDto>
 ) {
     fun toCommand() = CreateOrderCommand(
-        customerId = CustomerId.fromString(customerId),
         items = items.map {
             OrderItemRequest(
                 ProductId.fromString(it.productId),
@@ -62,7 +59,7 @@ data class OrderListResponse(
 
 fun Order.toResponse() = OrderResponse(
     id = id.toString(),
-    customerId = customerId.toString(),
+    userId = userId.toString(),
     status = status.name,
     items = items.map { it.toResponse() },
     totalAmount = totalAmount.toDecimal(),

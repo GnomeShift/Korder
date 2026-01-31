@@ -8,6 +8,8 @@ private val logger = KotlinLogging.logger {}
 data class AppConfig(
     val environment: Environment,
     val database: DatabaseConfig,
+    val jwt: JwtConfig,
+    val admin: AdminConfig,
     val logging: LoggingConfig
 ) {
     enum class Environment {
@@ -37,9 +39,23 @@ data class AppConfig(
             return AppConfig(
                 environment = Environment.fromString(profile!!),
                 database = DatabaseConfig.fromConfig(config),
+                jwt = JwtConfig.fromEnv(),
+                admin = AdminConfig.fromEnv(),
                 logging = LoggingConfig.fromEnv()
             )
         }
+    }
+}
+
+data class AdminConfig(
+    val email: String,
+    val password: String
+) {
+    companion object {
+        fun fromEnv() = AdminConfig(
+            email = EnvLoader.get("ADMIN_EMAIL")!!,
+            password = EnvLoader.get("ADMIN_PASSWORD")!!
+        )
     }
 }
 

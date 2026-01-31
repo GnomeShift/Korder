@@ -66,15 +66,12 @@ class DatabaseFactory(private val config: DatabaseConfig) {
             .dataSource(dataSource)
             .locations("classpath:db/migration")
             .baselineOnMigrate(true)
+            .baselineVersion("0")
             .validateMigrationNaming(true)
             .cleanDisabled(true)
             .load()
 
-        val result = flyway.migrate()
-
-        logger.info {
-            "${result.migrationsExecuted} migrations applied, current version: ${result.targetSchemaVersion}"
-        }
+        flyway.migrate()
     }
 }
 

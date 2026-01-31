@@ -10,6 +10,7 @@ val flyway_version: String by project
 val kotlin_logging: String by project
 val coroutines_version: String by project
 val dotenv_version: String by project
+val jbcrypt_version: String by project
 
 plugins {
     kotlin("jvm") version "2.3.0"
@@ -56,6 +57,9 @@ dependencies {
     implementation("io.insert-koin:koin-logger-slf4j:$koin_version")
     implementation("io.ktor:ktor-server-config-yaml:$ktor_version")
     implementation("io.github.cdimascio:dotenv-kotlin:$dotenv_version")
+    implementation("io.ktor:ktor-server-auth:$ktor_version")
+    implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")
+    implementation("org.mindrot:jbcrypt:$jbcrypt_version")
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }
