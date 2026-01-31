@@ -43,14 +43,14 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
-    val appConfig by inject<AppConfig>()
-    logger.info { "Starting application in ${appConfig.environment} mode" }
-
     // DI
     install(Koin) {
         slf4jLogger()
         modules(appModule(environment))
     }
+
+    val appConfig by inject<AppConfig>()
+    logger.info { "Starting application in ${appConfig.environment} mode" }
 
     // Database connection
     val databaseFactory by inject<DatabaseFactory>()
