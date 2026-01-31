@@ -45,6 +45,7 @@ class ExposedOrderRepository : OrderRepository {
             .where { OrdersTable.userId eq userId.value }
             .orderBy(OrdersTable.createdAt to SortOrder.DESC)
             .limit(pagination.size)
+            .offset(pagination.offset.toLong())
             .toList()
 
         val orderIds = orderRows.map { it[OrdersTable.id].value }
@@ -73,6 +74,7 @@ class ExposedOrderRepository : OrderRepository {
         } ?: OrdersTable.selectAll())
             .orderBy(OrdersTable.createdAt to SortOrder.DESC)
             .limit(pagination.size)
+            .offset(pagination.offset.toLong())
             .toList()
 
         val orderIds = orderRows.map { it[OrdersTable.id].value }
