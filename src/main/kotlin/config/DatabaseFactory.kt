@@ -66,6 +66,7 @@ class DatabaseFactory(private val config: DatabaseConfig) {
             .dataSource(dataSource)
             .locations("classpath:db/migration")
             .baselineOnMigrate(true)
+            .baselineVersion("0")
             .validateMigrationNaming(true)
             .cleanDisabled(true)
             .load()
