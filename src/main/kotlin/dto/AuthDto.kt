@@ -45,7 +45,6 @@ data class UserResponse(
     val email: String,
     val firstName: String,
     val lastName: String,
-    val fullName: String,
     val role: String,
     val createdAt: String
 )
@@ -55,7 +54,6 @@ fun User.toResponse() = UserResponse(
     email = email.value,
     firstName = firstName,
     lastName = lastName,
-    fullName = fullName,
     role = role.name,
     createdAt = createdAt.toString()
 )

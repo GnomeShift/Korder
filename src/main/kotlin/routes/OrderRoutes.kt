@@ -9,11 +9,10 @@ import model.OrderId
 import model.OrderStatus
 import plugins.adminOnly
 import plugins.authenticated
-import plugins.requireAdmin
 import plugins.requireUser
 import repository.Pagination
 import service.OrderService
-import java.util.*
+import utils.toUUIDOrNull
 
 fun Route.orderRoutes(orderService: OrderService) {
     route("/api/v1/orders") {
@@ -93,8 +92,6 @@ fun Route.orderRoutes(orderService: OrderService) {
 
         adminOnly {
             get("/all") {
-                call.requireAdmin()
-
                 val page = call.parameters["page"]?.toIntOrNull() ?: 1
                 val size = call.parameters["size"]?.toIntOrNull() ?: 20
                 val status = call.parameters["status"]?.let {
@@ -120,8 +117,6 @@ fun Route.orderRoutes(orderService: OrderService) {
             }
 
             post("{id}/confirm") {
-                call.requireAdmin()
-
                 val id = call.parameters["id"]?.toUUIDOrNull()
                     ?: return@post call.respond(
                         HttpStatusCode.BadRequest,
@@ -129,16 +124,9 @@ fun Route.orderRoutes(orderService: OrderService) {
                     )
 
                 orderService.confirmOrder(OrderId(id))
-                    .onSuccess { order ->
-                        call.respond(order.toResponse())
-                    }
-                    .onFailure { error ->
-                        throw error
-                    }
+                    .onSuccess { order -> call.respond(order.toResponse()) }
+                    .onFailure { error -> throw error }
             }
         }
     }
 }
-
-// Safe UUID parse
-private fun String.toUUIDOrNull(): UUID? = runCatching { UUID.fromString(this) }.getOrNull()

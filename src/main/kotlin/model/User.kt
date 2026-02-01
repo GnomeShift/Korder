@@ -14,9 +14,7 @@ data class User(
     val isActive: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant
-) {
-    val fullName: String get() = "$firstName $lastName"
-}
+)
 
 @Serializable
 @JvmInline
