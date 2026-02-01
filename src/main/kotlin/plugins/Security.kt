@@ -65,14 +65,6 @@ fun ApplicationCall.userPrincipal(): UserPrincipal? = principal<UserPrincipal>()
 fun ApplicationCall.requireUser(): UserPrincipal =
     userPrincipal() ?: throw AuthorizationException("Authentication required")
 
-fun ApplicationCall.requireAdmin(): UserPrincipal {
-    val user = requireUser()
-    if (!user.isAdmin()) {
-        throw AuthorizationException("You don't have permission")
-    }
-    return user
-}
-
 fun Route.authenticated(build: Route.() -> Unit): Route {
     return authenticate("auth-jwt") {
         build()
@@ -81,6 +73,13 @@ fun Route.authenticated(build: Route.() -> Unit): Route {
 
 fun Route.adminOnly(build: Route.() -> Unit): Route {
     return authenticate("auth-jwt") {
+        intercept(ApplicationCallPipeline.Call) {
+            val principal = call.principal<UserPrincipal>()
+
+            if (principal?.isAdmin() != true) {
+                throw AuthorizationException("You don't have permission")
+            }
+        }
         build()
     }
 }

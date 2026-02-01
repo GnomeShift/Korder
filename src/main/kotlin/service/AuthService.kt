@@ -71,7 +71,7 @@ class AuthServiceImpl(
         logger.info { "User registered: ${user.id}" }
 
         // Generate token
-        val token = jwtConfig.generateToken(user.id, user.email.value, user.role)
+        val token = jwtConfig.generateToken(user.id)
 
         return AuthResult(user, token)
     }
@@ -97,7 +97,7 @@ class AuthServiceImpl(
         logger.info { "User logged in: ${user.id}" }
 
         // Generate token
-        val token = jwtConfig.generateToken(user.id, user.email.value, user.role)
+        val token = jwtConfig.generateToken(user.id)
 
         return AuthResult(user, token)
     }

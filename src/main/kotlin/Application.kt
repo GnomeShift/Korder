@@ -77,7 +77,9 @@ fun Application.module() {
     configureContentNegotiation()
     configureCors(appConfig)
     configureCallLogging()
-    configureSecurity(appConfig.jwt, authService)
+
+    val userCache by inject<UserCache>()
+    configureSecurity(appConfig.jwt, userCache)
 
     install(RequestValidation) {
         configureValidation()
@@ -86,7 +88,7 @@ fun Application.module() {
     configureExceptionHandling()
 
     // Routes
-    configureRouting()
+    configureRouting(databaseFactory)
 
     logger.info {
         "Application started successfully on port ${environment.config.port}"
@@ -121,13 +123,13 @@ private fun Application.configureCors(config: AppConfig) {
             anyHost()
             logger.warn { "CORS: development mode" }
         } else {
-            val allowedHosts = EnvLoader.get("CORS_ALLOWED_HOSTS", "")
-                ?.split(",")
-                ?.map { it.trim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList()
+            config.cors.allowedHosts.forEach { host ->
+                allowHost(host, schemes = listOf("https", "http"))
+            }
+        }
 
-            allowedHosts.forEach { host -> allowHost(host, schemes = listOf("https", "http")) }
+        if (config.cors.allowCredentials) {
+            allowCredentials = true
         }
     }
 }
