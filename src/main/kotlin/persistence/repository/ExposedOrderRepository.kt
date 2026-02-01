@@ -12,7 +12,9 @@ import persistence.table.OrdersTable
 import repository.OrderRepository
 import repository.PaginatedResult
 import repository.Pagination
+import java.time.ZoneOffset
 import java.util.UUID
+import kotlin.time.Clock
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
@@ -89,14 +91,15 @@ class ExposedOrderRepository : OrderRepository {
 
     override suspend fun create(order: Order): Order = dbQuery {
         val orderId = UUID.randomUUID()
+        val now = Clock.System.now()
 
         OrdersTable.insert {
             it[id] = orderId
             it[userId] = order.userId.value
             it[status] = order.status.name
             it[totalAmount] = order.totalAmount.amount
-            it[createdAt] = order.createdAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
-            it[updatedAt] = order.updatedAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
+            it[createdAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 
         order.items.forEach { item ->
@@ -107,7 +110,7 @@ class ExposedOrderRepository : OrderRepository {
                 it[productName] = item.productName
                 it[quantity] = item.quantity
                 it[pricePerUnit] = item.pricePerUnit.amount
-                it[createdAt] = order.createdAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
+                it[createdAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
             }
         }
 
@@ -118,8 +121,10 @@ class ExposedOrderRepository : OrderRepository {
         OrdersTable.update({ OrdersTable.id eq order.id.value }) {
             it[status] = order.status.name
             it[totalAmount] = order.totalAmount.amount
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
-        order
+
+        order.copy(updatedAt = now)
     }
 
     override suspend fun delete(id: OrderId): Boolean = dbQuery {

@@ -112,6 +112,7 @@ class ExposedProductRepository : ProductRepository {
             command.description?.let { stmt[description] = it }
             command.price?.let { stmt[price] = it.amount }
             command.categoryId?.let { stmt[categoryId] = it.value }
+            stmt[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 
         if (updated > 0) findById(id) else null

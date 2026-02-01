@@ -20,8 +20,10 @@ import kotlin.time.Clock
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
-class ExposedUserRepository : UserRepository {
-    override suspend fun findById(id: UserId): User? = dbQuery {
+class ExposedUserRepository(
+    private val db: DatabaseContext
+) : UserRepository {
+    override suspend fun findById(id: UserId): User? = db.query {
         UsersTable
             .selectAll()
             .where { UsersTable.id eq id.value }
@@ -66,6 +68,7 @@ class ExposedUserRepository : UserRepository {
     override suspend fun updateRole(id: UserId, role: UserRole): User? = dbQuery {
         val updated = UsersTable.update({ UsersTable.id eq id.value }) {
             it[UsersTable.role] = role.name
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 
         if (updated > 0) findById(id) else null
@@ -74,6 +77,7 @@ class ExposedUserRepository : UserRepository {
     override suspend fun deactivate(id: UserId): Boolean = dbQuery {
         UsersTable.update({ UsersTable.id eq id.value }) {
             it[isActive] = false
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         } > 0
     }
 
