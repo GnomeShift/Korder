@@ -31,13 +31,11 @@ data class AppConfig(
             val config = environment.config
 
             // Set profile
-            val profile = EnvLoader.get("APP_ENV", "production")
+            val profile = EnvLoader.get("APP_ENV", "production")!!
             logger.info { "Loading configuration for profile: $profile" }
 
-            EnvLoader.load(profile)
-
             return AppConfig(
-                environment = Environment.fromString(profile!!),
+                environment = Environment.fromString(profile),
                 database = DatabaseConfig.fromConfig(config),
                 jwt = JwtConfig.fromEnv(),
                 admin = AdminConfig.fromEnv(),
