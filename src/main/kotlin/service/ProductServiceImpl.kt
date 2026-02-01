@@ -5,19 +5,14 @@ import exception.EntityNotFoundException
 import io.github.oshai.kotlinlogging.KotlinLogging
 import model.Product
 import model.ProductId
-import repository.CreateProductCommand
-import repository.PaginatedResult
-import repository.Pagination
-import repository.ProductRepository
-import repository.StockRepository
-import repository.UpdateProductCommand
-import kotlin.collections.map
+import repository.*
 
 private val logger = KotlinLogging.logger {}
 
 class ProductServiceImpl(
     private val productRepository: ProductRepository,
-    private val stockRepository: StockRepository
+    private val stockRepository: StockRepository,
+    private val categoryRepository: CategoryRepository
 ) : ProductService {
     override suspend fun getProduct(id: ProductId): ProductWithStock? {
         val product = productRepository.findById(id) ?: return null
@@ -44,7 +39,8 @@ class ProductServiceImpl(
         logger.info { "Creating product: ${command.name}" }
 
         val product = productRepository.create(command)
-        val stock = stockRepository.findByProductId(product.id)!!
+        val stock = stockRepository.findByProductId(product.id)
+            ?: throw IllegalStateException("Stock not created for product ${product.id.value}")
 
         logger.info { "Created product ${product.id.value} with ${stock.quantity} items in stock" }
 
