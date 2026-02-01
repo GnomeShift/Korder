@@ -23,6 +23,7 @@ object StockTable : UUIDTable("stock") {
     val productId = reference("product_id", ProductsTable).uniqueIndex()
     val quantity = integer("quantity")
     val reservedQuantity = integer("reserved_quantity")
+    val version = long("version").default(0)
     val updatedAt = timestampWithTimeZone("updated_at")
 }
 
