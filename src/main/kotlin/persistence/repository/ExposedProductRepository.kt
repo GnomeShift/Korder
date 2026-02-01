@@ -98,6 +98,7 @@ class ExposedProductRepository : ProductRepository {
             it[StockTable.productId] = productId
             it[quantity] = command.initialStock
             it[reservedQuantity] = 0
+            it[version] = 0
             it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 

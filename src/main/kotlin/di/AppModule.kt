@@ -17,7 +17,7 @@ fun appModule(environment: ApplicationEnvironment) = module {
 
     // Database
     single { DatabaseFactory(get()) }
-    single { UnitOfWork() }
+    single { DatabaseContext() }
 
     // Repositories
     single<ProductRepository> { ExposedProductRepository() }

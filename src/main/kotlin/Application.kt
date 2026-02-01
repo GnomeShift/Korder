@@ -29,6 +29,7 @@ import routes.productRoutes
 import service.AuthService
 import service.OrderService
 import service.ProductService
+import service.UserCache
 import validation.configureValidation
 
 private val logger = KotlinLogging.logger {}
