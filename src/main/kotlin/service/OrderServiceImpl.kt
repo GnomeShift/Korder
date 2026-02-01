@@ -1,9 +1,10 @@
 package service
 
+import config.DatabaseContext
 import exception.*
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.delay
 import model.*
-import persistence.UnitOfWork
 import repository.*
 import kotlin.time.Clock
 
@@ -14,10 +15,23 @@ class OrderServiceImpl(
     private val productRepository: ProductRepository,
     private val stockRepository: StockRepository,
     private val userRepository: UserRepository,
-    private val unitOfWork: UnitOfWork
+    private val db: DatabaseContext
 ) : OrderService {
-    override suspend fun createOrder(userId: UserId, command: CreateOrderCommand): Result<Order> = runCatching {
-        unitOfWork.transaction {
+    companion object {
+        private const val MAX_RETRIES = 3
+        private const val RETRY_DELAY_MS = 50L
+    }
+
+    override suspend fun createOrder(userId: UserId, command: CreateOrderCommand): Result<Order> {
+        return createOrderWithRetry(userId, command, MAX_RETRIES)
+    }
+
+    private suspend fun createOrderWithRetry(
+        userId: UserId,
+        command: CreateOrderCommand,
+        retriesLeft: Int
+    ): Result<Order> = runCatching {
+        db.transaction {
             logger.info { "Creating order for user $userId" }
 
             // Validate customer existence
@@ -35,7 +49,7 @@ class OrderServiceImpl(
             if (products.size != productIds.size) {
                 val foundIds = products.map { it.id }
                 val missingIds = productIds.filter { it !in foundIds }
-                throw EntityNotFoundException("Products", missingIds.map { it.toString() })
+                throw EntityNotFoundException("Products", missingIds.joinToString())
             }
 
             val productMap = products.associateBy { it.id }
@@ -93,10 +107,20 @@ class OrderServiceImpl(
 
             createdOrder
         }
+    }.recoverCatching { exception ->
+        if (exception is ConcurrentModificationException && retriesLeft > 0) {
+            logger.warn { "Retry due to concurrent modification, retries left: $retriesLeft" }
+
+            delay(RETRY_DELAY_MS * (MAX_RETRIES - retriesLeft + 1))
+            createOrderWithRetry(userId, command, retriesLeft - 1).getOrThrow()
+        }
+        else {
+            throw exception
+        }
     }
 
     override suspend fun cancelOrder(userId: UserId, orderId: OrderId): Result<Order> = runCatching {
-        unitOfWork.transaction {
+        db.transaction {
             logger.info { "User $userId cancelling order $orderId" }
 
             val order = orderRepository.findById(orderId)
@@ -119,16 +143,16 @@ class OrderServiceImpl(
             releaseStock(order)
 
             val cancelledOrder = order.cancel()
-            orderRepository.update(cancelledOrder)
+            val updatedOrder = orderRepository.update(cancelledOrder)
 
             logger.info { "Order $orderId cancelled successfully" }
 
-            cancelledOrder
+            updatedOrder
         }
     }
 
     override suspend fun deleteOrder(userId: UserId, orderId: OrderId): Result<Boolean> = runCatching {
-        unitOfWork.transaction {
+        db.transaction {
             logger.info { "User $userId deleting order $orderId" }
 
             val order = orderRepository.findById(orderId)
@@ -164,7 +188,7 @@ class OrderServiceImpl(
     }
 
     override suspend fun confirmOrder(orderId: OrderId): Result<Order> = runCatching {
-        unitOfWork.transaction {
+        db.transaction {
             logger.info { "Confirming order $orderId" }
 
             val order = orderRepository.findById(orderId)
@@ -191,11 +215,11 @@ class OrderServiceImpl(
             stockRepository.updateBatch(updatedStocks)
 
             val confirmedOrder = order.confirm()
-            orderRepository.update(confirmedOrder)
+            val updatedOrder = orderRepository.update(confirmedOrder)
 
             logger.info { "Order $orderId confirmed successfully" }
 
-            confirmedOrder
+            updatedOrder
         }
     }
 
@@ -214,7 +238,6 @@ class OrderServiceImpl(
         pagination: Pagination,
         status: OrderStatus?
     ): PaginatedResult<Order> {
-        // Это админский метод - проверка прав на уровне route
         return orderRepository.findAll(pagination, status)
     }
 
@@ -235,7 +258,7 @@ class OrderServiceImpl(
 
             when (order.status) {
                 OrderStatus.PENDING -> stock.cancelReservation(item.quantity)
-                OrderStatus.CONFIRMED -> stock.copy(quantity = stock.quantity + item.quantity)
+                OrderStatus.CONFIRMED -> stock.addStock(item.quantity)
                 else -> stock
             }
         }

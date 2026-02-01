@@ -89,5 +89,10 @@ class DatabaseFactory(private val config: DatabaseConfig) {
     }
 }
 
-suspend fun <T> dbQuery(block: suspend () -> T): T =
-    suspendTransaction { withContext(Dispatchers.IO) { block() } }
+class DatabaseContext {
+    suspend fun <T> query(block: suspend () -> T): T =
+        suspendTransaction { withContext(Dispatchers.IO) { block() } }
+
+    suspend fun <T> transaction(block: suspend () -> T): T =
+        suspendTransaction { withContext(Dispatchers.IO) { block() } }
+}
