@@ -31,6 +31,7 @@ import service.OrderService
 import service.ProductService
 import service.UserCache
 import validation.configureValidation
+import kotlin.time.Clock
 
 private val logger = KotlinLogging.logger {}
 
@@ -145,7 +146,7 @@ private fun Application.configureCallLogging() {
     }
 }
 
-private fun Application.configureRouting() {
+private fun Application.configureRouting(databaseFactory: DatabaseFactory) {
     val productService by inject<ProductService>()
     val orderService by inject<OrderService>()
     val categoryRepository by inject<CategoryRepository>()
@@ -153,8 +154,16 @@ private fun Application.configureRouting() {
 
     routing {
         get("/health") {
-            call.respond(mapOf(
-                "status" to "UP"
+            val dbHealthy = databaseFactory.isHealthy()
+            val status = if (dbHealthy) "UP" else "DEGRADED"
+            val statusCode = if (dbHealthy) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+
+            call.respond(statusCode, mapOf(
+                "status" to status,
+                "checks" to mapOf(
+                    "database" to if (dbHealthy) "UP" else "DOWN"
+                ),
+                "timestamp" to Clock.System.now().toString()
             ))
         }
 
