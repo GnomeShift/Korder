@@ -7,10 +7,9 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import model.ProductId
 import plugins.adminOnly
-import plugins.requireAdmin
 import repository.Pagination
 import service.ProductService
-import java.util.*
+import utils.toUUIDOrNull
 
 fun Route.productRoutes(productService: ProductService) {
     route("/api/v1/products") {
@@ -59,8 +58,6 @@ fun Route.productRoutes(productService: ProductService) {
 
         adminOnly {
             post {
-                call.requireAdmin()
-
                 val request = call.receive<CreateProductRequest>()
                 val product = productService.createProduct(request.toCommand())
 
@@ -68,8 +65,6 @@ fun Route.productRoutes(productService: ProductService) {
             }
 
             patch("{id}") {
-                call.requireAdmin()
-
                 val id = call.parameters["id"]?.toUUIDOrNull()
                     ?: return@patch call.respond(
                         HttpStatusCode.BadRequest,
@@ -87,8 +82,6 @@ fun Route.productRoutes(productService: ProductService) {
             }
 
             delete("{id}") {
-                call.requireAdmin()
-
                 val id = call.parameters["id"]?.toUUIDOrNull()
                     ?: return@delete call.respond(
                         HttpStatusCode.BadRequest,
@@ -101,6 +94,3 @@ fun Route.productRoutes(productService: ProductService) {
         }
     }
 }
-
-// Safe UUID parse
-private fun String.toUUIDOrNull(): UUID? = runCatching { UUID.fromString(this) }.getOrNull()

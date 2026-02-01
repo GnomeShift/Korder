@@ -10,6 +10,7 @@ data class AppConfig(
     val database: DatabaseConfig,
     val jwt: JwtConfig,
     val admin: AdminConfig,
+    val cors: CorsConfig,
     val logging: LoggingConfig
 ) {
     enum class Environment {
@@ -31,16 +32,15 @@ data class AppConfig(
             val config = environment.config
 
             // Set profile
-            val profile = EnvLoader.get("APP_ENV", "production")
+            val profile = EnvLoader.get("APP_ENV", "production")!!
             logger.info { "Loading configuration for profile: $profile" }
 
-            EnvLoader.load(profile)
-
             return AppConfig(
-                environment = Environment.fromString(profile!!),
+                environment = Environment.fromString(profile),
                 database = DatabaseConfig.fromConfig(config),
                 jwt = JwtConfig.fromEnv(),
                 admin = AdminConfig.fromEnv(),
+                cors = CorsConfig.fromEnv(),
                 logging = LoggingConfig.fromEnv()
             )
         }
@@ -53,8 +53,24 @@ data class AdminConfig(
 ) {
     companion object {
         fun fromEnv() = AdminConfig(
-            email = EnvLoader.get("ADMIN_EMAIL")!!,
-            password = EnvLoader.get("ADMIN_PASSWORD")!!
+            email = EnvLoader.getRequired("ADMIN_EMAIL"),
+            password = EnvLoader.getRequired("ADMIN_PASSWORD")
+        )
+    }
+}
+
+data class CorsConfig(
+    val allowedHosts: List<String>,
+    val allowCredentials: Boolean
+) {
+    companion object {
+        fun fromEnv() = CorsConfig(
+            allowedHosts = EnvLoader.get("CORS_ALLOWED_HOSTS", "")
+                ?.split(",")
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?: emptyList(),
+            allowCredentials = EnvLoader.getBoolean("CORS_ALLOW_CREDENTIALS", true)
         )
     }
 }

@@ -8,6 +8,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.util.UUID
+import kotlin.math.roundToLong
 
 object UUIDSerializer : KSerializer<UUID> {
     override val descriptor: SerialDescriptor =
@@ -81,16 +82,33 @@ value class StockId(@Serializable(with = UUIDSerializer::class) val value: UUID)
 value class Money(val amount: Long) {
     init {
         require(amount >= 0) { "Money cannot be negative" }
+        require(amount <= MAX_AMOUNT) { "Money exceeds maximum allowed value" }
     }
 
-    operator fun plus(other: Money) = Money(amount + other.amount)
-    operator fun times(quantity: Int) = Money(amount * quantity)
+    operator fun plus(other: Money): Money {
+        val sum = amount + other.amount
+        check(sum in amount..MAX_AMOUNT) { "Money overflow" }
+        return Money(sum)
+    }
+
+    operator fun times(quantity: Int): Money {
+        require(quantity >= 0) { "Quantity cannot be negative" }
+        val result = amount.toBigInteger() * quantity.toBigInteger()
+        check(result <= MAX_AMOUNT.toBigInteger()) { "Money overflow" }
+        return Money(result.toLong())
+    }
 
     fun toDecimal(): Double = amount / 100.0
 
     companion object {
-        fun fromDecimal(value: Double): Money = Money((value * 100).toLong())
+        const val MAX_AMOUNT = 999_999_999_999L
         val ZERO = Money(0)
+
+        fun fromDecimal(value: Double): Money {
+            require(value >= 0) { "Money cannot be negative" }
+            require(value <= MAX_AMOUNT / 100.0) { "Money exceeds maximum allowed value" }
+            return Money((value * 100).roundToLong())
+        }
     }
 }
 

@@ -33,6 +33,20 @@ class DatabaseFactory(private val config: DatabaseConfig) {
         }
     }
 
+    fun isHealthy(): Boolean {
+        return try {
+            if (!::dataSource.isInitialized || dataSource.isClosed) {
+                return false
+            }
+            dataSource.connection.use { conn ->
+                conn.prepareStatement("SELECT 1").use { stmt -> stmt.executeQuery().use { rs -> rs.next() } }
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Database seems to be down" }
+            false
+        }
+    }
+
     private fun createHikariDataSource(): HikariDataSource {
         val hikariConfig = HikariConfig().apply {
             jdbcUrl = config.jdbcUrl
@@ -75,5 +89,10 @@ class DatabaseFactory(private val config: DatabaseConfig) {
     }
 }
 
-suspend fun <T> dbQuery(block: suspend () -> T): T =
-    suspendTransaction { withContext(Dispatchers.IO) { block() } }
+class DatabaseContext {
+    suspend fun <T> query(block: suspend () -> T): T =
+        suspendTransaction { withContext(Dispatchers.IO) { block() } }
+
+    suspend fun <T> transaction(block: suspend () -> T): T =
+        suspendTransaction { withContext(Dispatchers.IO) { block() } }
+}

@@ -4,7 +4,8 @@ data class Stock(
     val id: StockId,
     val productId: ProductId,
     val quantity: Int,
-    val reservedQuantity: Int
+    val reservedQuantity: Int,
+    val version: Long = 0
 ) {
     val availableQuantity: Int get() = quantity - reservedQuantity
 
@@ -26,5 +27,10 @@ data class Stock(
             quantity = quantity - amount,
             reservedQuantity = reservedQuantity - amount
         )
+    }
+
+    fun addStock(amount: Int): Stock {
+        require(amount > 0) { "Amount must be positive" }
+        return copy(quantity = quantity + amount)
     }
 }

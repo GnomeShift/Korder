@@ -1,6 +1,6 @@
 package persistence.repository
 
-import config.dbQuery
+import config.DatabaseContext
 import model.Email
 import model.User
 import model.UserId
@@ -20,8 +20,10 @@ import kotlin.time.Clock
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
-class ExposedUserRepository : UserRepository {
-    override suspend fun findById(id: UserId): User? = dbQuery {
+class ExposedUserRepository(
+    private val db: DatabaseContext
+) : UserRepository {
+    override suspend fun findById(id: UserId): User? = db.query {
         UsersTable
             .selectAll()
             .where { UsersTable.id eq id.value }
@@ -29,7 +31,7 @@ class ExposedUserRepository : UserRepository {
             .singleOrNull()
     }
 
-    override suspend fun findByEmail(email: Email): User? = dbQuery {
+    override suspend fun findByEmail(email: Email): User? = db.query {
         UsersTable
             .selectAll()
             .where { UsersTable.email.lowerCase() eq email.value.lowercase() }
@@ -37,14 +39,14 @@ class ExposedUserRepository : UserRepository {
             .singleOrNull()
     }
 
-    override suspend fun existsByEmail(email: Email): Boolean = dbQuery {
+    override suspend fun existsByEmail(email: Email): Boolean = db.query {
         UsersTable
             .selectAll()
             .where { UsersTable.email.lowerCase() eq email.value.lowercase() }
             .count() > 0
     }
 
-    override suspend fun create(command: CreateUserCommand): User = dbQuery {
+    override suspend fun create(command: CreateUserCommand): User = db.query {
         val now = Clock.System.now()
         val userId = UUID.randomUUID()
 
@@ -63,17 +65,23 @@ class ExposedUserRepository : UserRepository {
         findById(UserId(userId))!!
     }
 
-    override suspend fun updateRole(id: UserId, role: UserRole): User? = dbQuery {
+    override suspend fun updateRole(id: UserId, role: UserRole): User? = db.query {
+        val now = Clock.System.now()
+
         val updated = UsersTable.update({ UsersTable.id eq id.value }) {
             it[UsersTable.role] = role.name
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 
         if (updated > 0) findById(id) else null
     }
 
-    override suspend fun deactivate(id: UserId): Boolean = dbQuery {
+    override suspend fun deactivate(id: UserId): Boolean = db.query {
+        val now = Clock.System.now()
+
         UsersTable.update({ UsersTable.id eq id.value }) {
             it[isActive] = false
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         } > 0
     }
 

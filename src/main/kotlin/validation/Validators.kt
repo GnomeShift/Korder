@@ -1,57 +1,61 @@
 package validation
 
-import dto.CreateOrderRequest
-import dto.CreateProductRequest
-import dto.LoginRequest
-import dto.RegisterRequest
-import dto.UpdateProductRequest
+import dto.*
 import io.ktor.server.plugins.requestvalidation.*
-import java.util.*
+import utils.isValidUUID
+
+object ValidationRules {
+    fun notBlank(value: String, field: String): String? =
+        if (value.isBlank()) "$field: cannot be blank" else null
+
+    fun maxLength(value: String, max: Int, field: String): String? =
+        if (value.length > max) "$field: cannot exceed $max characters" else null
+
+    fun minLength(value: String, min: Int, field: String): String? =
+        if (value.length < min) "$field: must be at least $min characters" else null
+
+    fun positive(value: Number, field: String): String? =
+        if (value.toDouble() <= 0) "$field: must be positive" else null
+
+    fun nonNegative(value: Number, field: String): String? =
+        if (value.toDouble() < 0) "$field: cannot be negative" else null
+
+    fun max(value: Number, max: Number, field: String): String? =
+        if (value.toDouble() > max.toDouble()) "$field: cannot exceed $max" else null
+
+    fun validUUID(value: String, field: String): String? =
+        if (!value.isValidUUID()) "$field: must be a valid UUID" else null
+
+    fun email(value: String, field: String): String? =
+        if (!EMAIL_REGEX.matches(value)) "$field: invalid format" else null
+
+    private val EMAIL_REGEX = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+}
 
 fun RequestValidationConfig.configureValidation() {
     validate<CreateProductRequest> { request ->
-        val errors = mutableListOf<String>()
-
-        if (request.name.isBlank()) {
-            errors.add("name: cannot be blank")
-        }
-        if (request.name.length > 255) {
-            errors.add("name: cannot exceed 255 characters")
-        }
-        if (request.description.isBlank()) {
-            errors.add("description: cannot be blank")
-        }
-        if (request.price <= 0) {
-            errors.add("price: must be positive")
-        }
-        if (request.price > 1_000_000) {
-            errors.add("price: cannot exceed 1,000,000")
-        }
-        if (!request.categoryId.isValidUUID()) {
-            errors.add("categoryId: must be a valid UUID")
-        }
-        if (request.initialStock < 0) {
-            errors.add("initialStock: cannot be negative")
-        }
+        val errors = listOfNotNull(
+            ValidationRules.notBlank(request.name, "name"),
+            ValidationRules.maxLength(request.name, 255, "name"),
+            ValidationRules.notBlank(request.description, "description"),
+            ValidationRules.positive(request.price, "price"),
+            ValidationRules.max(request.price, 1_000_000, "price"),
+            ValidationRules.validUUID(request.categoryId, "categoryId"),
+            ValidationRules.nonNegative(request.initialStock, "initialStock")
+        )
 
         if (errors.isEmpty()) ValidationResult.Valid
         else ValidationResult.Invalid(errors)
     }
 
     validate<UpdateProductRequest> { request ->
-        val errors = mutableListOf<String>()
-
-        request.name?.let {
-            if (it.isBlank()) errors.add("name: cannot be blank")
-            if (it.length > 255) errors.add("name: cannot exceed 255 characters")
-        }
-        request.price?.let {
-            if (it <= 0) errors.add("price: must be positive")
-            if (it > 1_000_000) errors.add("price: cannot exceed 1,000,000")
-        }
-        request.categoryId?.let {
-            if (!it.isValidUUID()) errors.add("categoryId: must be a valid UUID")
-        }
+        val errors = listOfNotNull(
+            request.name?.let { ValidationRules.notBlank(it, "name") },
+            request.name?.let { ValidationRules.maxLength(it, 255, "name") },
+            request.price?.let { ValidationRules.positive(it, "price") },
+            request.price?.let { ValidationRules.max(it, 1_000_000, "price") },
+            request.categoryId?.let { ValidationRules.validUUID(it, "categoryId") }
+        )
 
         if (errors.isEmpty()) ValidationResult.Valid
         else ValidationResult.Invalid(errors)
@@ -65,15 +69,9 @@ fun RequestValidationConfig.configureValidation() {
         }
 
         request.items.forEachIndexed { index, item ->
-            if (!item.productId.isValidUUID()) {
-                errors.add("items[$index].productId: must be a valid UUID")
-            }
-            if (item.quantity <= 0) {
-                errors.add("items[$index].quantity: must be positive")
-            }
-            if (item.quantity > 1000) {
-                errors.add("items[$index].quantity: cannot exceed 1000")
-            }
+            ValidationRules.validUUID(item.productId, "items[$index].productId")?.let { errors.add(it) }
+            ValidationRules.positive(item.quantity, "items[$index].quantity")?.let { errors.add(it) }
+            ValidationRules.max(item.quantity, 1000, "items[$index].quantity")?.let { errors.add(it) }
         }
 
         // Check for duplicate products
@@ -87,51 +85,28 @@ fun RequestValidationConfig.configureValidation() {
     }
 
     validate<RegisterRequest> { request ->
-        val errors = mutableListOf<String>()
-
-        if (request.email.isBlank()) {
-            errors.add("email: cannot be blank")
-        }
-        if (!request.email.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"))) {
-            errors.add("email: invalid format")
-        }
-        if (request.password.length < 8) {
-            errors.add("password: must be at least 8 characters")
-        }
-        if (request.password.length > 100) {
-            errors.add("password: cannot exceed 100 characters")
-        }
-        if (request.firstName.isBlank()) {
-            errors.add("firstName: cannot be blank")
-        }
-        if (request.firstName.length > 100) {
-            errors.add("firstName: cannot exceed 100 characters")
-        }
-        if (request.lastName.isBlank()) {
-            errors.add("lastName: cannot be blank")
-        }
-        if (request.lastName.length > 100) {
-            errors.add("lastName: cannot exceed 100 characters")
-        }
+        val errors = listOfNotNull(
+            ValidationRules.notBlank(request.email, "email"),
+            ValidationRules.email(request.email, "email"),
+            ValidationRules.minLength(request.password, 8, "password"),
+            ValidationRules.maxLength(request.password, 100, "password"),
+            ValidationRules.notBlank(request.firstName, "firstName"),
+            ValidationRules.maxLength(request.firstName, 100, "firstName"),
+            ValidationRules.notBlank(request.lastName, "lastName"),
+            ValidationRules.maxLength(request.lastName, 100, "lastName")
+        )
 
         if (errors.isEmpty()) ValidationResult.Valid
         else ValidationResult.Invalid(errors)
     }
 
     validate<LoginRequest> { request ->
-        val errors = mutableListOf<String>()
-
-        if (request.email.isBlank()) {
-            errors.add("email: cannot be blank")
-        }
-        if (request.password.isBlank()) {
-            errors.add("password: cannot be blank")
-        }
+        val errors = listOfNotNull(
+            ValidationRules.notBlank(request.email, "email"),
+            ValidationRules.notBlank(request.password, "password")
+        )
 
         if (errors.isEmpty()) ValidationResult.Valid
         else ValidationResult.Invalid(errors)
     }
 }
-
-// Safe UUID parse
-private fun String.isValidUUID(): Boolean = runCatching { UUID.fromString(this) }.isSuccess

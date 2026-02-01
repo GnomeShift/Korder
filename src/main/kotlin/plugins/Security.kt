@@ -9,7 +9,7 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.routing.*
 import model.UserId
 import model.UserRole
-import service.AuthService
+import service.UserCache
 
 private val logger = KotlinLogging.logger {}
 
@@ -17,11 +17,11 @@ data class UserPrincipal(
     val userId: UserId,
     val email: String,
     val role: UserRole
-) : Principal {
+) {
     fun isAdmin(): Boolean = role == UserRole.ADMIN
 }
 
-fun Application.configureSecurity(jwtConfig: JwtConfig, authService: AuthService) {
+fun Application.configureSecurity(jwtConfig: JwtConfig, userCache: UserCache) {
     install(Authentication) {
         jwt("auth-jwt") {
             realm = jwtConfig.realm
@@ -31,23 +31,22 @@ fun Application.configureSecurity(jwtConfig: JwtConfig, authService: AuthService
             validate { credential ->
                 try {
                     val userId = credential.payload.subject
-                    val email = credential.payload.getClaim("email").asString()
-                    val role = credential.payload.getClaim("role").asString()
 
-                    if (userId != null && email != null && role != null) {
-                        val user = authService.findUserById(UserId.fromString(userId))
+                    if (userId != null) {
+                        val user = userCache.getActiveUser(UserId.fromString(userId))
 
-                        if (user != null && user.isActive) {
+                        if (user != null) {
                             UserPrincipal(
-                                userId = UserId.fromString(userId),
-                                email = email,
-                                role = UserRole.fromString(role)
+                                userId = user.id,
+                                email = user.email.value,
+                                role = user.role
                             )
                         } else {
                             logger.warn { "User not found or inactive: $userId" }
                             null
                         }
                     } else {
+                        logger.warn { "Invalid JWT claims" }
                         null
                     }
                 } catch (e: Exception) {
@@ -66,14 +65,6 @@ fun ApplicationCall.userPrincipal(): UserPrincipal? = principal<UserPrincipal>()
 fun ApplicationCall.requireUser(): UserPrincipal =
     userPrincipal() ?: throw AuthorizationException("Authentication required")
 
-fun ApplicationCall.requireAdmin(): UserPrincipal {
-    val user = requireUser()
-    if (!user.isAdmin()) {
-        throw AuthorizationException("You don't have permission")
-    }
-    return user
-}
-
 fun Route.authenticated(build: Route.() -> Unit): Route {
     return authenticate("auth-jwt") {
         build()
@@ -82,6 +73,13 @@ fun Route.authenticated(build: Route.() -> Unit): Route {
 
 fun Route.adminOnly(build: Route.() -> Unit): Route {
     return authenticate("auth-jwt") {
+        intercept(ApplicationCallPipeline.Call) {
+            val principal = call.principal<UserPrincipal>()
+
+            if (principal?.isAdmin() != true) {
+                throw AuthorizationException("You don't have permission")
+            }
+        }
         build()
     }
 }

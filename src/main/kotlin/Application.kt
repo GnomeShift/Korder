@@ -29,7 +29,9 @@ import routes.productRoutes
 import service.AuthService
 import service.OrderService
 import service.ProductService
+import service.UserCache
 import validation.configureValidation
+import kotlin.time.Clock
 
 private val logger = KotlinLogging.logger {}
 
@@ -43,14 +45,14 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
-    val appConfig by inject<AppConfig>()
-    logger.info { "Starting application in ${appConfig.environment} mode" }
-
     // DI
     install(Koin) {
         slf4jLogger()
         modules(appModule(environment))
     }
+
+    val appConfig by inject<AppConfig>()
+    logger.info { "Starting application in ${appConfig.environment} mode" }
 
     // Database connection
     val databaseFactory by inject<DatabaseFactory>()
@@ -75,7 +77,9 @@ fun Application.module() {
     configureContentNegotiation()
     configureCors(appConfig)
     configureCallLogging()
-    configureSecurity(appConfig.jwt, authService)
+
+    val userCache by inject<UserCache>()
+    configureSecurity(appConfig.jwt, userCache)
 
     install(RequestValidation) {
         configureValidation()
@@ -84,7 +88,7 @@ fun Application.module() {
     configureExceptionHandling()
 
     // Routes
-    configureRouting()
+    configureRouting(databaseFactory)
 
     logger.info {
         "Application started successfully on port ${environment.config.port}"
@@ -119,13 +123,13 @@ private fun Application.configureCors(config: AppConfig) {
             anyHost()
             logger.warn { "CORS: development mode" }
         } else {
-            val allowedHosts = EnvLoader.get("CORS_ALLOWED_HOSTS", "")
-                ?.split(",")
-                ?.map { it.trim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList()
+            config.cors.allowedHosts.forEach { host ->
+                allowHost(host, schemes = listOf("https", "http"))
+            }
+        }
 
-            allowedHosts.forEach { _ -> }
+        if (config.cors.allowCredentials) {
+            allowCredentials = true
         }
     }
 }
@@ -144,7 +148,7 @@ private fun Application.configureCallLogging() {
     }
 }
 
-private fun Application.configureRouting() {
+private fun Application.configureRouting(databaseFactory: DatabaseFactory) {
     val productService by inject<ProductService>()
     val orderService by inject<OrderService>()
     val categoryRepository by inject<CategoryRepository>()
@@ -152,8 +156,16 @@ private fun Application.configureRouting() {
 
     routing {
         get("/health") {
-            call.respond(mapOf(
-                "status" to "UP"
+            val dbHealthy = databaseFactory.isHealthy()
+            val status = if (dbHealthy) "UP" else "DEGRADED"
+            val statusCode = if (dbHealthy) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+
+            call.respond(statusCode, mapOf(
+                "status" to status,
+                "checks" to mapOf(
+                    "database" to if (dbHealthy) "UP" else "DOWN"
+                ),
+                "timestamp" to Clock.System.now().toString()
             ))
         }
 

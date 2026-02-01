@@ -1,5 +1,6 @@
 package model
 
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 data class Order(
@@ -22,22 +23,34 @@ data class Order(
 
     fun cancel(): Order {
         require(canCancel()) { "Cannot cancel order in status: $status" }
-        return copy(status = OrderStatus.CANCELLED)
+        return copy(
+            status = OrderStatus.CANCELLED,
+            updatedAt = Clock.System.now()
+        )
     }
 
     fun confirm(): Order {
         require(canConfirm()) { "Cannot confirm order in status: $status" }
-        return copy(status = OrderStatus.CONFIRMED)
+        return copy(
+            status = OrderStatus.CONFIRMED,
+            updatedAt = Clock.System.now()
+        )
     }
 
     fun ship(): Order {
         require(status == OrderStatus.CONFIRMED) { "Cannot ship order in status: $status" }
-        return copy(status = OrderStatus.SHIPPED)
+        return copy(
+            status = OrderStatus.SHIPPED,
+            updatedAt = Clock.System.now()
+        )
     }
 
     fun complete(): Order {
         require(status == OrderStatus.SHIPPED) { "Cannot complete order in status: $status" }
-        return copy(status = OrderStatus.COMPLETED)
+        return copy(
+            status = OrderStatus.COMPLETED,
+            updatedAt = Clock.System.now()
+        )
     }
 }
 

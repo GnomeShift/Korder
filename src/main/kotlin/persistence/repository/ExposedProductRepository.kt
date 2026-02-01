@@ -1,6 +1,6 @@
 package persistence.repository
 
-import config.dbQuery
+import config.DatabaseContext
 import model.*
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.*
@@ -14,8 +14,10 @@ import kotlin.time.Clock
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
-class ExposedProductRepository : ProductRepository {
-    override suspend fun findById(id: ProductId): Product? = dbQuery {
+class ExposedProductRepository(
+    private val db: DatabaseContext
+) : ProductRepository {
+    override suspend fun findById(id: ProductId): Product? = db.query {
         (ProductsTable innerJoin CategoriesTable)
             .selectAll()
             .where { ProductsTable.id eq id.value }
@@ -23,7 +25,7 @@ class ExposedProductRepository : ProductRepository {
             .singleOrNull()
     }
 
-    override suspend fun findAll(pagination: Pagination): PaginatedResult<Product> = dbQuery {
+    override suspend fun findAll(pagination: Pagination): PaginatedResult<Product> = db.query {
         val total = ProductsTable.selectAll().count()
 
         val items = (ProductsTable innerJoin CategoriesTable)
@@ -39,7 +41,7 @@ class ExposedProductRepository : ProductRepository {
     override suspend fun findByCategory(
         categoryId: CategoryId,
         pagination: Pagination
-    ): PaginatedResult<Product> = dbQuery {
+    ): PaginatedResult<Product> = db.query {
         val total = ProductsTable
             .selectAll()
             .where { ProductsTable.categoryId eq categoryId.value }
@@ -56,7 +58,7 @@ class ExposedProductRepository : ProductRepository {
         PaginatedResult(items, total, pagination.page, pagination.size)
     }
 
-    override suspend fun search(query: String, pagination: Pagination): PaginatedResult<Product> = dbQuery {
+    override suspend fun search(query: String, pagination: Pagination): PaginatedResult<Product> = db.query {
         val searchPattern = "%${query.lowercase()}%"
 
         val searchCondition: Op<Boolean> =
@@ -78,7 +80,7 @@ class ExposedProductRepository : ProductRepository {
         PaginatedResult(items, total, pagination.page, pagination.size)
     }
 
-    override suspend fun create(command: CreateProductCommand): Product = dbQuery {
+    override suspend fun create(command: CreateProductCommand): Product = db.query {
         val now = Clock.System.now()
         val productId = UUID.randomUUID()
 
@@ -98,26 +100,32 @@ class ExposedProductRepository : ProductRepository {
             it[StockTable.productId] = productId
             it[quantity] = command.initialStock
             it[reservedQuantity] = 0
+            it[version] = 0
             it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 
-        findById(ProductId(productId))!!
+        findById(ProductId(productId))
+            ?: throw IllegalStateException("Failed to create product")
     }
 
-    override suspend fun update(id: ProductId, command: UpdateProductCommand): Product? = dbQuery {
-        if (!command.hasUpdates()) return@dbQuery findById(id)
+    override suspend fun update(id: ProductId, command: UpdateProductCommand): Product? = db.query {
+        if (!command.hasUpdates()) return@query findById(id)
+
+        val now = Clock.System.now()
 
         val updated = ProductsTable.update({ ProductsTable.id eq id.value }) { stmt ->
             command.name?.let { stmt[name] = it }
             command.description?.let { stmt[description] = it }
             command.price?.let { stmt[price] = it.amount }
             command.categoryId?.let { stmt[categoryId] = it.value }
+            stmt[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 
         if (updated > 0) findById(id) else null
     }
 
-    override suspend fun delete(id: ProductId): Boolean = dbQuery {
+    override suspend fun delete(id: ProductId): Boolean = db.query {
+        StockTable.deleteWhere { StockTable.productId eq id.value }
         ProductsTable.deleteWhere { ProductsTable.id eq id.value } > 0
     }
 

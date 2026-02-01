@@ -1,6 +1,6 @@
 package persistence.repository
 
-import config.dbQuery
+import config.DatabaseContext
 import model.*
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
@@ -12,16 +12,20 @@ import persistence.table.OrdersTable
 import repository.OrderRepository
 import repository.PaginatedResult
 import repository.Pagination
+import java.time.ZoneOffset
 import java.util.UUID
+import kotlin.time.Clock
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
-class ExposedOrderRepository : OrderRepository {
-    override suspend fun findById(id: OrderId): Order? = dbQuery {
+class ExposedOrderRepository(
+    private val db: DatabaseContext
+) : OrderRepository {
+    override suspend fun findById(id: OrderId): Order? = db.query {
         val orderRow = OrdersTable
             .selectAll()
             .where { OrdersTable.id eq id.value }
-            .singleOrNull() ?: return@dbQuery null
+            .singleOrNull() ?: return@query null
 
         val items = OrderItemsTable
             .selectAll()
@@ -34,7 +38,7 @@ class ExposedOrderRepository : OrderRepository {
     override suspend fun findByUserId(
         userId: UserId,
         pagination: Pagination
-    ): PaginatedResult<Order> = dbQuery {
+    ): PaginatedResult<Order> = db.query {
         val total = OrdersTable
             .selectAll()
             .where { OrdersTable.userId eq userId.value }
@@ -45,6 +49,7 @@ class ExposedOrderRepository : OrderRepository {
             .where { OrdersTable.userId eq userId.value }
             .orderBy(OrdersTable.createdAt to SortOrder.DESC)
             .limit(pagination.size)
+            .offset(pagination.offset.toLong())
             .toList()
 
         val orderIds = orderRows.map { it[OrdersTable.id].value }
@@ -60,7 +65,7 @@ class ExposedOrderRepository : OrderRepository {
     override suspend fun findAll(
         pagination: Pagination,
         status: OrderStatus?
-    ): PaginatedResult<Order> = dbQuery {
+    ): PaginatedResult<Order> = db.query {
         val baseQuery = OrdersTable.selectAll()
         val filteredQuery = status?.let {
             baseQuery.where { OrdersTable.status eq it.name }
@@ -73,6 +78,7 @@ class ExposedOrderRepository : OrderRepository {
         } ?: OrdersTable.selectAll())
             .orderBy(OrdersTable.createdAt to SortOrder.DESC)
             .limit(pagination.size)
+            .offset(pagination.offset.toLong())
             .toList()
 
         val orderIds = orderRows.map { it[OrdersTable.id].value }
@@ -85,16 +91,17 @@ class ExposedOrderRepository : OrderRepository {
         PaginatedResult(orders, total, pagination.page, pagination.size)
     }
 
-    override suspend fun create(order: Order): Order = dbQuery {
+    override suspend fun create(order: Order): Order = db.query {
         val orderId = UUID.randomUUID()
+        val now = Clock.System.now()
 
         OrdersTable.insert {
             it[id] = orderId
             it[userId] = order.userId.value
             it[status] = order.status.name
             it[totalAmount] = order.totalAmount.amount
-            it[createdAt] = order.createdAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
-            it[updatedAt] = order.updatedAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
+            it[createdAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
 
         order.items.forEach { item ->
@@ -105,22 +112,27 @@ class ExposedOrderRepository : OrderRepository {
                 it[productName] = item.productName
                 it[quantity] = item.quantity
                 it[pricePerUnit] = item.pricePerUnit.amount
-                it[createdAt] = order.createdAt.toJavaInstant().atOffset(java.time.ZoneOffset.UTC)
+                it[createdAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
             }
         }
 
         findById(OrderId(orderId))!!
     }
 
-    override suspend fun update(order: Order): Order = dbQuery {
+    override suspend fun update(order: Order): Order = db.query {
+        val now = Clock.System.now()
+
         OrdersTable.update({ OrdersTable.id eq order.id.value }) {
             it[status] = order.status.name
             it[totalAmount] = order.totalAmount.amount
+            it[updatedAt] = now.toJavaInstant().atOffset(ZoneOffset.UTC)
         }
-        order
+
+        order.copy(updatedAt = now)
     }
 
-    override suspend fun delete(id: OrderId): Boolean = dbQuery {
+    override suspend fun delete(id: OrderId): Boolean = db.query {
+        OrderItemsTable.deleteWhere { OrderItemsTable.orderId eq id.value }
         OrdersTable.deleteWhere { OrdersTable.id eq id.value } > 0
     }
 
