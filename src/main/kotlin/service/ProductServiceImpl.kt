@@ -38,6 +38,10 @@ class ProductServiceImpl(
     override suspend fun createProduct(command: CreateProductCommand): ProductWithStock {
         logger.info { "Creating product: ${command.name}" }
 
+        // Check category existence
+        categoryRepository.findById(command.categoryId)
+            ?: throw EntityNotFoundException("Category", command.categoryId)
+
         val product = productRepository.create(command)
         val stock = stockRepository.findByProductId(product.id)
             ?: throw IllegalStateException("Stock not created for product ${product.id.value}")
@@ -49,6 +53,12 @@ class ProductServiceImpl(
 
     override suspend fun updateProduct(id: ProductId, command: UpdateProductCommand): ProductWithStock? {
         logger.info { "Updating product: ${id.value}" }
+
+        // Check category existence
+        command.categoryId?.let { categoryId ->
+            categoryRepository.findById(categoryId)
+                ?: throw EntityNotFoundException("Category", categoryId)
+        }
 
         val updatedProduct = productRepository.update(id, command) ?: return null
         val stock = stockRepository.findByProductId(id)
