@@ -54,3 +54,12 @@ object OrderItemsTable : UUIDTable("order_items") {
     val pricePerUnit = long("price_per_unit")
     val createdAt = timestampWithTimeZone("created_at")
 }
+
+object AuditLogsTable : UUIDTable("audit_logs") {
+    val action = varchar("action", 50).index()
+    val entityType = varchar("entity_type", 50).index()
+    val entityId = varchar("entity_id", 255).index()
+    val userId = reference("user_id", UsersTable).nullable().index()
+    val details = text("details").nullable()
+    val createdAt = timestampWithTimeZone("created_at")
+}

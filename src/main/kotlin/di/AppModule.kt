@@ -25,12 +25,13 @@ fun appModule(environment: ApplicationEnvironment) = module {
     single<OrderRepository> { ExposedOrderRepository(get()) }
     single<CategoryRepository> { ExposedCategoryRepository(get()) }
     single<UserRepository> { ExposedUserRepository(get()) }
+    single<AuditLogRepository> { ExposedAuditLogRepository(get()) }
 
     // Cache
     single { UserCache(get()) }
 
     // Services
     single<ProductService> { ProductServiceImpl(get(), get(), get()) }
-    single<OrderService> { OrderServiceImpl(get(), get(), get(), get(), get()) }
+    single<OrderService> { OrderServiceImpl(get(), get(), get(), get(), get(), get()) }
     single<AuthService> { AuthServiceImpl(get(), get()) }
 }
