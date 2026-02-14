@@ -21,6 +21,7 @@ import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 import plugins.configureExceptionHandling
 import plugins.configureSecurity
+import plugins.configureSwagger
 import repository.CategoryRepository
 import routes.authRoutes
 import routes.categoryRoutes
@@ -87,12 +88,17 @@ fun Application.module() {
 
     configureExceptionHandling()
 
+    // Swagger
+    configureSwagger()
+
     // Routes
     configureRouting(databaseFactory)
 
     logger.info {
         "Application started successfully on port ${environment.config.port}"
     }
+
+    logger.info { "Swagger available at /swagger" }
 }
 
 private fun Application.configureContentNegotiation() {

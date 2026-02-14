@@ -15,7 +15,8 @@ class OrderServiceImpl(
     private val productRepository: ProductRepository,
     private val stockRepository: StockRepository,
     private val userRepository: UserRepository,
-    private val db: DatabaseContext
+    private val db: DatabaseContext,
+    private val auditLogRepository: AuditLogRepository
 ) : OrderService {
     companion object {
         private const val MAX_RETRIES = 3
@@ -101,6 +102,15 @@ class OrderServiceImpl(
 
             val createdOrder = orderRepository.create(order)
 
+            // Write audit log
+            auditLogRepository.log(
+                action = AuditAction.ORDER_CREATED,
+                entityType = "Order",
+                entityId = createdOrder.id.toString(),
+                userId = userId,
+                details = "items=${createdOrder.totalItems}, total=${createdOrder.totalAmount.toDecimal()}"
+            )
+
             logger.info {
                 "Created order ${createdOrder.id} with ${createdOrder.totalItems} items, total: ${createdOrder.totalAmount.toDecimal()}"
             }
@@ -145,6 +155,15 @@ class OrderServiceImpl(
             val cancelledOrder = order.cancel()
             val updatedOrder = orderRepository.update(cancelledOrder)
 
+            // Write audit log
+            auditLogRepository.log(
+                action = AuditAction.ORDER_CANCELLED,
+                entityType = "Order",
+                entityId = orderId.toString(),
+                userId = userId,
+                details = "previousStatus=${order.status.name}"
+            )
+
             logger.info { "Order $orderId cancelled successfully" }
 
             updatedOrder
@@ -180,6 +199,15 @@ class OrderServiceImpl(
             val deleted = orderRepository.delete(orderId)
 
             if (deleted) {
+                // Write audit log
+                auditLogRepository.log(
+                    action = AuditAction.ORDER_DELETED,
+                    entityType = "Order",
+                    entityId = orderId.toString(),
+                    userId = userId,
+                    details = "status=${order.status.name}"
+                )
+
                 logger.info { "Order $orderId deleted successfully" }
             }
 
@@ -216,6 +244,15 @@ class OrderServiceImpl(
 
             val confirmedOrder = order.confirm()
             val updatedOrder = orderRepository.update(confirmedOrder)
+
+            // Write audit log
+            auditLogRepository.log(
+                action = AuditAction.ORDER_CONFIRMED,
+                entityType = "Order",
+                entityId = orderId.toString(),
+                userId = order.userId,
+                details = "items=${order.totalItems}, total=${order.totalAmount.toDecimal()}"
+            )
 
             logger.info { "Order $orderId confirmed successfully" }
 
