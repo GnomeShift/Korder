@@ -1,6 +1,6 @@
 package persistence.repository
 
-import config.dbQuery
+import config.DatabaseContext
 import model.Category
 import model.CategoryId
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -15,8 +15,10 @@ import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
 
-class ExposedCategoryRepository : CategoryRepository {
-    override suspend fun findById(id: CategoryId): Category? = dbQuery {
+class ExposedCategoryRepository(
+    private val db: DatabaseContext
+) : CategoryRepository {
+    override suspend fun findById(id: CategoryId): Category? = db.query {
         CategoriesTable
             .selectAll()
             .where { CategoriesTable.id eq id.value }
@@ -24,14 +26,14 @@ class ExposedCategoryRepository : CategoryRepository {
             .singleOrNull()
     }
 
-    override suspend fun findAll(): List<Category> = dbQuery {
+    override suspend fun findAll(): List<Category> = db.query {
         CategoriesTable
             .selectAll()
             .orderBy(CategoriesTable.name to SortOrder.ASC)
             .map { it.toCategory() }
     }
 
-    override suspend fun create(name: String, description: String?): Category = dbQuery {
+    override suspend fun create(name: String, description: String?): Category = db.query {
         val now = Clock.System.now()
         val categoryId = UUID.randomUUID()
 

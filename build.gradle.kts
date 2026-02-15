@@ -10,6 +10,7 @@ val flyway_version: String by project
 val kotlin_logging: String by project
 val coroutines_version: String by project
 val dotenv_version: String by project
+val jbcrypt_version: String by project
 
 plugins {
     kotlin("jvm") version "2.3.0"
@@ -18,7 +19,7 @@ plugins {
 }
 
 group = "com.gnomeshift"
-version = "1.0.0"
+version = "1.3.0"
 
 application {
     mainClass = "io.ktor.server.netty.EngineMain"
@@ -56,6 +57,13 @@ dependencies {
     implementation("io.insert-koin:koin-logger-slf4j:$koin_version")
     implementation("io.ktor:ktor-server-config-yaml:$ktor_version")
     implementation("io.github.cdimascio:dotenv-kotlin:$dotenv_version")
+    implementation("io.ktor:ktor-server-auth:$ktor_version")
+    implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")
+    implementation("org.mindrot:jbcrypt:$jbcrypt_version")
+    implementation("io.ktor:ktor-server-swagger:$ktor_version")
+    implementation("io.ktor:ktor-server-core:$ktor_version")
+    implementation("io.ktor:ktor-server-openapi:$ktor_version")
+    implementation("io.ktor:ktor-server-routing-openapi:$ktor_version")
     testImplementation("io.ktor:ktor-server-test-host")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }

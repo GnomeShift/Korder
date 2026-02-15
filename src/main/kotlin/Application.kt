@@ -6,29 +6,33 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.netty.EngineMain
+import io.ktor.server.netty.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.requestvalidation.*
-import io.ktor.server.request.httpMethod
-import io.ktor.server.request.path
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 import plugins.configureExceptionHandling
+import plugins.configureSecurity
+import plugins.configureSwagger
 import repository.CategoryRepository
-import repository.CustomerRepository
+import routes.authRoutes
 import routes.categoryRoutes
-import routes.customerRoutes
 import routes.orderRoutes
 import routes.productRoutes
+import service.AuthService
 import service.OrderService
 import service.ProductService
+import service.UserCache
 import validation.configureValidation
+import kotlin.time.Clock
 
 private val logger = KotlinLogging.logger {}
 
@@ -42,21 +46,27 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
-    val appConfig by lazy {
-        AppConfig.load(environment)
-    }
-
-    logger.info { "Starting application in ${appConfig.environment} mode" }
-
     // DI
     install(Koin) {
         slf4jLogger()
         modules(appModule(environment))
     }
 
+    val appConfig by inject<AppConfig>()
+    logger.info { "Starting application in ${appConfig.environment} mode" }
+
     // Database connection
     val databaseFactory by inject<DatabaseFactory>()
     databaseFactory.connect()
+
+    // Create default admin if doesn't exists
+    val authService by inject<AuthService>()
+    runBlocking {
+        authService.checkAdminExistence(
+            email = appConfig.admin.email,
+            password = appConfig.admin.password
+        )
+    }
 
     // Graceful shutdown
     monitor.subscribe(ApplicationStopped) {
@@ -69,18 +79,26 @@ fun Application.module() {
     configureCors(appConfig)
     configureCallLogging()
 
+    val userCache by inject<UserCache>()
+    configureSecurity(appConfig.jwt, userCache)
+
     install(RequestValidation) {
         configureValidation()
     }
 
     configureExceptionHandling()
 
+    // Swagger
+    configureSwagger()
+
     // Routes
-    configureRouting()
+    configureRouting(databaseFactory)
 
     logger.info {
         "Application started successfully on port ${environment.config.port}"
     }
+
+    logger.info { "Swagger available at /swagger" }
 }
 
 private fun Application.configureContentNegotiation() {
@@ -111,13 +129,13 @@ private fun Application.configureCors(config: AppConfig) {
             anyHost()
             logger.warn { "CORS: development mode" }
         } else {
-            val allowedHosts = EnvLoader.get("CORS_ALLOWED_HOSTS", "")
-                ?.split(",")
-                ?.map { it.trim() }
-                ?.filter { it.isNotEmpty() }
-                ?: emptyList()
+            config.cors.allowedHosts.forEach { host ->
+                allowHost(host, schemes = listOf("https", "http"))
+            }
+        }
 
-            allowedHosts.forEach { _ -> }
+        if (config.cors.allowCredentials) {
+            allowCredentials = true
         }
     }
 }
@@ -136,23 +154,31 @@ private fun Application.configureCallLogging() {
     }
 }
 
-private fun Application.configureRouting() {
+private fun Application.configureRouting(databaseFactory: DatabaseFactory) {
     val productService by inject<ProductService>()
     val orderService by inject<OrderService>()
-    val customerRepository by inject<CustomerRepository>()
     val categoryRepository by inject<CategoryRepository>()
+    val authService by inject<AuthService>()
 
     routing {
         get("/health") {
-            call.respond(mapOf(
-                "status" to "UP"
+            val dbHealthy = databaseFactory.isHealthy()
+            val status = if (dbHealthy) "UP" else "DEGRADED"
+            val statusCode = if (dbHealthy) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+
+            call.respond(statusCode, mapOf(
+                "status" to status,
+                "checks" to mapOf(
+                    "database" to if (dbHealthy) "UP" else "DOWN"
+                ),
+                "timestamp" to Clock.System.now().toString()
             ))
         }
 
         // API routes
+        authRoutes(authService)
         productRoutes(productService)
         orderRoutes(orderService)
-        customerRoutes(customerRepository)
         categoryRoutes(categoryRepository)
     }
 }

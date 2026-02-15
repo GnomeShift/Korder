@@ -1,0 +1,123 @@
+openapi: 3.1.2
+info:
+  title: Korder API
+  description: Order management system.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, firstName, lastName]
+      properties:
+        email: { type: string, format: email, example: user@example.com }
+        password: { type: string, minLength: 8, example: password123 }
+        firstName: { type: string, example: Иван }
+        lastName: { type: string, example: Иванов }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, example: user@example.com }
+        password: { type: string, example: password123 }
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            email: { type: string }
+            role: { type: string }
+    CreateOrderRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: GetHealth
+      responses:
+        '200':
+          description: OK
+  /api/v1/auth/register:
+    post:
+      summary: Register
+      tags: [Auth]
+      operationId: RegisterUser
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Created }
+  /api/v1/auth/login:
+    post:
+      summary: Login
+      tags: [Auth]
+      operationId: LoginUser
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+  /api/v1/products:
+    get:
+      summary: Products list
+      tags: [Products]
+      operationId: GetProductList
+      parameters:
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: size, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create product (Admin)
+      tags: [Products]
+      operationId: CreateProduct
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+  /api/v1/orders:
+    get:
+      summary: My orders
+      tags: [Orders]
+      operationId: GetMyOrders
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create order
+      tags: [Orders]
+      operationId: CreateOrder
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrderRequest' }
+      responses:
+        '201': { description: Created }

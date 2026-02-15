@@ -1,0 +1,23 @@
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_categories_name ON categories(name);
+CREATE INDEX idx_products_category_id ON products(category_id);
+CREATE INDEX idx_products_name_trgm ON products USING gin(name gin_trgm_ops);
+CREATE INDEX idx_products_description_trgm ON products USING gin(description gin_trgm_ops);
+CREATE INDEX idx_products_price ON products(price);
+CREATE INDEX idx_products_created_at ON products(created_at DESC);
+CREATE INDEX idx_stock_product_id ON stock(product_id);
+CREATE UNIQUE INDEX idx_users_email_lower ON users(LOWER(email));
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_active ON users(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_orders_user_id ON orders(user_id);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX idx_orders_user_status ON orders(user_id, status);
+CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX idx_order_items_product_id ON order_items(product_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX idx_audit_logs_entity_type ON audit_logs(entity_type);
+CREATE INDEX idx_audit_logs_entity_id ON audit_logs(entity_id);
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);

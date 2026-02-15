@@ -1,40 +1,37 @@
 package di
 
-import persistence.repository.ExposedCategoryRepository
-import persistence.repository.ExposedCustomerRepository
 import config.AppConfig
+import config.DatabaseContext
 import config.DatabaseFactory
-import repository.StockRepository
 import io.ktor.server.application.*
 import org.koin.dsl.module
-import persistence.UnitOfWork
 import persistence.repository.*
-import repository.CategoryRepository
-import repository.CustomerRepository
-import repository.OrderRepository
-import repository.ProductRepository
-import service.OrderService
-import service.OrderServiceImpl
-import service.ProductService
-import service.ProductServiceImpl
+import repository.*
+import service.*
 
 fun appModule(environment: ApplicationEnvironment) = module {
     // Config
     single { AppConfig.load(environment) }
     single { get<AppConfig>().database }
+    single { get<AppConfig>().jwt }
 
     // Database
     single { DatabaseFactory(get()) }
-    single { UnitOfWork() }
+    single { DatabaseContext() }
 
     // Repositories
-    single<ProductRepository> { ExposedProductRepository() }
-    single<StockRepository> { ExposedStockRepository() }
-    single<OrderRepository> { ExposedOrderRepository() }
-    single<CustomerRepository> { ExposedCustomerRepository() }
-    single<CategoryRepository> { ExposedCategoryRepository() }
+    single<ProductRepository> { ExposedProductRepository(get()) }
+    single<StockRepository> { ExposedStockRepository(get()) }
+    single<OrderRepository> { ExposedOrderRepository(get()) }
+    single<CategoryRepository> { ExposedCategoryRepository(get()) }
+    single<UserRepository> { ExposedUserRepository(get()) }
+    single<AuditLogRepository> { ExposedAuditLogRepository(get()) }
+
+    // Cache
+    single { UserCache(get()) }
 
     // Services
-    single<ProductService> { ProductServiceImpl(get(), get()) }
-    single<OrderService> { OrderServiceImpl(get(), get(), get(), get(), get()) }
+    single<ProductService> { ProductServiceImpl(get(), get(), get()) }
+    single<OrderService> { OrderServiceImpl(get(), get(), get(), get(), get(), get()) }
+    single<AuthService> { AuthServiceImpl(get(), get()) }
 }

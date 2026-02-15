@@ -11,10 +11,10 @@ object CategoriesTable : UUIDTable("categories") {
 }
 
 object ProductsTable : UUIDTable("products") {
-    val name = varchar("name", 255)
+    val name = varchar("name", 255).index()
     val description = text("description")
-    val priceAmount = long("price_amount")
-    val categoryId = reference("category_id", CategoriesTable)
+    val price = long("price")
+    val categoryId = reference("category_id", CategoriesTable).index()
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 }
@@ -23,31 +23,43 @@ object StockTable : UUIDTable("stock") {
     val productId = reference("product_id", ProductsTable).uniqueIndex()
     val quantity = integer("quantity")
     val reservedQuantity = integer("reserved_quantity")
+    val version = long("version").default(0)
     val updatedAt = timestampWithTimeZone("updated_at")
 }
 
-object CustomersTable : UUIDTable("customers") {
+object UsersTable : UUIDTable("users") {
     val email = varchar("email", 255).uniqueIndex()
+    val passwordHash = varchar("password_hash", 255)
     val firstName = varchar("first_name", 100)
     val lastName = varchar("last_name", 100)
-    val phone = varchar("phone", 20).nullable()
+    val role = varchar("role", 20).index()
+    val isActive = bool("is_active").index()
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 }
 
 object OrdersTable : UUIDTable("orders") {
-    val customerId = reference("customer_id", CustomersTable)
-    val status = varchar("status", 20)
+    val userId = reference("user_id", UsersTable).index()
+    val status = varchar("status", 20).index()
     val totalAmount = long("total_amount")
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 }
 
 object OrderItemsTable : UUIDTable("order_items") {
-    val orderId = reference("order_id", OrdersTable)
+    val orderId = reference("order_id", OrdersTable).index()
     val productId = reference("product_id", ProductsTable)
     val productName = varchar("product_name", 255)
     val quantity = integer("quantity")
     val pricePerUnit = long("price_per_unit")
+    val createdAt = timestampWithTimeZone("created_at")
+}
+
+object AuditLogsTable : UUIDTable("audit_logs") {
+    val action = varchar("action", 50).index()
+    val entityType = varchar("entity_type", 50).index()
+    val entityId = varchar("entity_id", 255).index()
+    val userId = reference("user_id", UsersTable).nullable().index()
+    val details = text("details").nullable()
     val createdAt = timestampWithTimeZone("created_at")
 }
