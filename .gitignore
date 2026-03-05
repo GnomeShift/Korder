@@ -7,7 +7,7 @@ build/
 
 ### .ENV ###
 .env*
-!.env
+!.env.production
 
 ### STS ###
 .apt_generated
