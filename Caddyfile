@@ -1,0 +1,17 @@
+{
+    admin off
+
+    log {
+        output stdout
+        format console
+    }
+}
+
+:80 {
+    reverse_proxy /api/* korder:8080
+}
+
+:443 {
+    tls internal
+    reverse_proxy /api/* korder:8080
+}

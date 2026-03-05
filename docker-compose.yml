@@ -1,0 +1,79 @@
+services:
+  korder-db:
+    image: postgres:18-alpine
+    container_name: "korder-db"
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - korder-db-data:/var/lib/postgresql/data
+    networks:
+      - korder-network
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}' ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: 5
+
+  korder:
+    image: korder:latest
+    container_name: "korder"
+    env_file:
+      - .env.production
+    networks:
+      - korder-network
+    depends_on:
+      korder-db:
+        condition: service_healthy
+    healthcheck:
+      test: "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: 5
+
+  korder-caddy:
+    image: caddy:alpine
+    container_name: "korder-caddy"
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    networks:
+      - korder-network
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - korder-caddy-ssl-data:/data
+
+volumes:
+  korder-db-data:
+    driver: local
+    external: false
+    name: korder-db-data
+
+  korder-caddy-ssl-data:
+    driver: local
+    external: false
+    name: korder-caddy-ssl-data
+
+networks:
+  korder-network:
+    driver: bridge
+    external: false
+    name: korder-network

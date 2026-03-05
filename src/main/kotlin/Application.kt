@@ -2,6 +2,8 @@ import config.AppConfig
 import config.DatabaseFactory
 import config.EnvLoader
 import di.appModule
+import dto.HealthChecks
+import dto.HealthResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -166,13 +168,13 @@ private fun Application.configureRouting(databaseFactory: DatabaseFactory) {
             val status = if (dbHealthy) "UP" else "DEGRADED"
             val statusCode = if (dbHealthy) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
 
-            call.respond(statusCode, mapOf(
-                "status" to status,
-                "checks" to mapOf(
-                    "database" to if (dbHealthy) "UP" else "DOWN"
-                ),
-                "timestamp" to Clock.System.now().toString()
-            ))
+            call.respond(statusCode,
+                HealthResponse(
+                    status = status,
+                    checks = HealthChecks(database = if (dbHealthy) "UP" else "DOWN"),
+                    timestamp = Clock.System.now().toString()
+                )
+            )
         }
 
         // API routes
