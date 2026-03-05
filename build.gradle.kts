@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 val ktor_version: String by project
 val exposed_version: String by project
 val h2_version: String by project
@@ -31,6 +33,17 @@ repositories {
 
 kotlin {
     jvmToolchain(21)
+}
+
+tasks.withType<ShadowJar> {
+    mergeServiceFiles{
+        include("META-INF/services/**")
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+        exclude("logback.xml")
+        from("src/main/resources") {
+            include("logback.xml")
+        }
+    }
 }
 
 dependencies {
